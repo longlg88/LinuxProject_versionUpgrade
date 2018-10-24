@@ -24,11 +24,74 @@ function error(){
 }
 
 # start
-echo "========= TmaxLinux version start changing ..."
-sleep 1
-echo "..."
+echo "=============== TmaxLinux version v4.0 to v4.1 upgrade ..."
 
-echo -e "\n ========= Version Changing ..."
+##### Modify /etc/lsb-release /etc/os-release CODENAME=artful if CODENAME=4 
+lsb_codename=`grep -w "4$" /etc/lsb-release`
+os_codename=`grep -w "4$" /etc/os-release`
+
+if [ -z $lsb_codename ]; then
+	echo "===== lsb codename is artful"
+else
+	sudo sed -i -e "s/DISTRIB_CODENAME=4/DISTRIB_CODENAME=artful/g" /etc/lsb-release
+fi
+
+if [ -z $os_codename ]; then
+	echo "===== os codename is artful"
+else
+	sudo sed -i -e "s/VERSION_CODENAME=4/VERSION_CODENAME=artful/g" /etc/os-release
+	sudo sed -i -e "s/TMAXLINUX_CODENAME=4/TMAXLINUX_CODENAME=artful/g" /etc/os-release
+fi
+
+
+
+
+
+
+
+echo -e "=============== Ready to version upgrade..."
+upgrade_dir=".upgrade"
+if [ -d "$upgrade_dir" ]; then
+	sudo apt-get -y remove ubuntu-release-upgrader-core > .upgrade/upgrade_log
+	sudo apt-get -y install ubuntu-release-upgrader-core > .upgrade/upgrade_log
+else
+	mkdir .upgrade
+fi
+
+echo -e ".\c" ; sleep 1 ; echo -e ".\c" ; sleep 1 ; echo -e "."
+
+## it will be removed upgrade_log
+#sudo rm -f upgrade_log
+
+
+## do-release-upgrade 
+## checking if upgradable. if it is already upgrade, then modify services
+echo -e "=============== << 1 >> version upgrading start..."
+do_result=`do-release-upgrade -c`
+if [ "$do_result" = "Checking for a new TmaxLinux release No new release found." ]; then
+	echo -e "\n=============== << 1 >> version upgrading finish"
+else
+	while true; do
+		echo -e "version check(c) version upgrade(u) exit(x)"
+		read options
+		if [ "$options" = "c" ]; then
+			do-release-upgrade -c
+		elif [ "$options" = "u" ]; then
+			do-release-upgrade
+			break
+		elif [ "$options" = "x" ]; then
+			exit 9
+		else
+			echo "Wrong options"
+		fi
+	done
+fi
+
+### If it is upgraded, then will reboot
+### So run "version_upgrade" one more time.
+
+#############################################################################################################
+echo -e "\n=============== << 2 >> version upgrading start..."
 sleep 1
 
 file_os="/etc/os-release.prev"
@@ -65,25 +128,26 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 
 	error $? 1
 
-	echo 'TmaxLinux 4.1.1 \n \l' >> $HOME/issue
-	echo 'TmaxLinux 4.1.1' >> $HOME/issue.net
+	sudo echo 'TmaxLinux 4.1.1 \n \l' >> $HOME/issue
+	sudo echo 'TmaxLinux 4.1.1' >> $HOME/issue.net
 
 	sudo mv $HOME/issue /etc/issue
 	sudo mv $HOME/issue.net /etc/issue.net
 
 	error $? 1
-	echo -e "\n ========= Changing version finished !!"
-
+	echo -e "\n=============== << 2 >> version upgrading finished !!"
+else
+	echo -e "\n=============== << 2 >> version upgrading finished !!"
 fi
 
 
 ## installing prozone packages
 while true; do
-	echo -e "\n ========= Do you want to install prozone packages? [y/n]"
+	echo -e "\n=============== Do you want to install prozone packages? [y/n]"
 	read answer
 
 	if [ "$answer" = "y" ]; then
-		echo -e "\n ========= Install prozone packages ..."
+		echo -e "\n=============== Install prozone packages ..."
 		sleep 1
 		echo "..."
 
@@ -102,7 +166,7 @@ while true; do
 
 		error $? 3
 		
-		echo -e "\n ========= Nftables version"
+		echo -e "\n===== Nftables version"
 		nft -v
 		###########################################################################
 		break
@@ -111,22 +175,22 @@ while true; do
 		echo -e "\n Prozone package is not installed"
 		break	
 	else
-		echo "Wrong answer"
+		echo "Wrong options"
 	fi
 done
 
 ## motd service enable & motd-news service remove 
-echo -e "\n ========= motd.service enable"
+echo -e "\n=============== motd.service enable"
 file="/etc/update-motd.d/50-motd-news.dpkg-dist"
 
 if [ -f "$file" ]; then
 	sudo mv /etc/update-motd.d/50-motd-news.dpkg-dist /etc/update-motd.d/50-motd-news
 	error $? 4
 	sudo systemctl restart motd-news.service
-	echo -e "\n ========= motd.service restart sucess"
+	echo -e "\n=============== motd.service restart sucess"
 fi
 
-echo -e "\n ========= motd.service finish"
+echo -e "\n=============== motd.service finish"
 
 
 echo -e "\n ========= motd.news remove"
