@@ -1,4 +1,6 @@
 #!/bin/bash
+
+# error function uses for handling common error cases
 function error(){
 	local value=$1
 	local num=$2
@@ -21,6 +23,7 @@ function error(){
 	fi
 }
 
+# start
 echo "========= TmaxLinux version start changing ..."
 sleep 1
 echo "..."
@@ -31,6 +34,7 @@ sleep 1
 file_os="/etc/os-release.prev"
 file_lsb="/etc/lsb-release.prev"
 
+## file version checking and modifying
 if [ ! -f "$file_os" ];then
 	sudo cp /etc/os-release /etc/os-release.prev &&
 	sudo cp /etc/lsb-release /etc/lsb-release.prev
@@ -72,6 +76,8 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 
 fi
 
+
+## installing prozone packages
 while true; do
 	echo -e "\n ========= Do you want to install prozone packages? [y/n]"
 	read answer
@@ -88,17 +94,17 @@ while true; do
 		sudo apt-get -y remove postfix
 
 		error $? 2
-
+		############################ It will be deprecated #######################
 		sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/nftables ./
 
 		cd $HOME/nftables
 		sudo dpkg -i *.deb
 
 		error $? 3
-
+		
 		echo -e "\n ========= Nftables version"
 		nft -v
-		
+		###########################################################################
 		break
 
 	elif [ "$answer" = "n" ]; then
@@ -109,6 +115,7 @@ while true; do
 	fi
 done
 
+## motd service enable & motd-news service remove 
 echo -e "\n ========= motd.service enable"
 file="/etc/update-motd.d/50-motd-news.dpkg-dist"
 
