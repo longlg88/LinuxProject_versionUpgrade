@@ -34,6 +34,7 @@ if [ -z $lsb_codename ]; then
 	echo "===== lsb codename is artful"
 else
 	sudo sed -i -e "s/DISTRIB_CODENAME=4/DISTRIB_CODENAME=artful/g" /etc/lsb-release
+	echo "===== lsb codename change artful"
 fi
 
 if [ -z $os_codename ]; then
@@ -41,10 +42,8 @@ if [ -z $os_codename ]; then
 else
 	sudo sed -i -e "s/VERSION_CODENAME=4/VERSION_CODENAME=artful/g" /etc/os-release
 	sudo sed -i -e "s/TMAXLINUX_CODENAME=4/TMAXLINUX_CODENAME=artful/g" /etc/os-release
+	echo "===== os codename change artful"
 fi
-
-
-
 
 
 
@@ -56,6 +55,8 @@ if [ -d "$upgrade_dir" ]; then
 	sudo apt-get -y install ubuntu-release-upgrader-core > .upgrade/upgrade_log
 else
 	mkdir .upgrade
+	sudo apt-get -y remove ubuntu-release-upgrader-core > .upgrade/upgrade_log
+	sudo apt-get -y install ubuntu-release-upgrader-core > .upgrade/upgrade_log
 fi
 
 echo -e ".\c" ; sleep 1 ; echo -e ".\c" ; sleep 1 ; echo -e "."
@@ -68,8 +69,8 @@ echo -e ".\c" ; sleep 1 ; echo -e ".\c" ; sleep 1 ; echo -e "."
 ## checking if upgradable. if it is already upgrade, then modify services
 echo -e "=============== << 1 >> version upgrading start..."
 do_result=`do-release-upgrade -c`
-if [ "$do_result" = "Checking for a new TmaxLinux release No new release found." ]; then
-	echo -e "\n=============== << 1 >> version upgrading finish"
+if [[ "$do_result" =~ "No new release found." ]]; then
+	echo -e "\n=============== << 1 >> version upgrading finished !!"
 else
 	while true; do
 		echo -e "version check(c) version upgrade(u) exit(x)"
@@ -190,6 +191,23 @@ if [ -f "$file" ]; then
 	echo -e "\n=============== motd.service restart sucess"
 fi
 
+
+##### Modify /etc/update-motd.d/10-help-text /etc/update-motd.d/10-help-text
+re_help_text=`grep -r "#printf" /etc/update-motd.d/10-help-text`
+if [ -z "$re_help_text" ]; then
+	sudo sed -i "s/printf/#printf/g" /etc/update-motd.d/10-help-text
+else
+	echo "===== no help text"
+fi
+
+landscape_file="/etc/update-motd.d/50-landscape-sysinfo"
+
+if [ -f "$landscape_file" ]; then
+	sudo rm -f /etc/update-motd.d/50-landscape-sysinfo
+else
+	echo "===== no landscape"
+fi
+
 echo -e "\n=============== motd.service finish"
 
 
@@ -201,13 +219,13 @@ if [ -f "$motd_file" ]; then
 
 	if [ "$file_size_kb" -ge 1 ]; then
 		sudo mv /var/cache/motd-news /var/cache/copy.motd-news
-		sudo echo "" > /var/cache/motd-news
+		sudo touch $motd_file 
 	else
-		sudo echo "" > /var/cache/motd-news
+		sudo touch $motd_file
 	fi
 
 else
-	sudo touch /var/cache/motd-news
+	sudo touch $motd_file
 fi
 echo -e "\n ========= motd.news remove finish !!"
 
