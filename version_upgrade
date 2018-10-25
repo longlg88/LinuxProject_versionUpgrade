@@ -23,6 +23,18 @@ function error(){
 	fi
 }
 
+# Execute with argument options
+while [ $# -ne 0 ]
+do
+    case "$1" in
+        --version | -v)
+            echo "v1.0.0"
+			exit
+            ;;
+    esac
+    shift
+done
+
 # start
 echo "=============== TmaxLinux version v4.0 to v4.1 upgrade ..."
 
