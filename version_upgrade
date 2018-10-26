@@ -168,9 +168,6 @@ while true; do
 
 		error $? 2
 
-		sudo apt-get -y remove postfix
-
-		error $? 2
 		############################ It will be deprecated #######################
 		sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/nftables ./
 
