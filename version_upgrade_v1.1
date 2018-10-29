@@ -1,0 +1,248 @@
+#!/bin/bash
+
+# error function uses for handling common error cases
+function error(){
+	local value=$1
+	local num=$2
+
+	if [ ${num} -eq 1 ]; then
+		local str="version changing failed"
+	elif [ ${num} -eq 2 ]; then
+		local str="install prozone packages failed"
+	elif [ ${num} -eq 3 ]; then
+		local str="install nftables package failed"
+	elif [ ${num} -eq 4 ]; then
+		local str="motd service confirm failed"
+	else
+		local str="Fail!"
+	fi
+
+	if [ ${value} -ne 0 ]; then
+		echo "Error : ${str}"
+		exit 9
+	fi
+}
+
+## For motd-news.service inactive
+function motd_news_inactive(){
+	local pw=$1
+
+	sudo apt-get -y install expect > /dev/null
+
+	echo -e "\n ========= motd.news disable"
+
+	sudo sed -i "s/ENABLED=1/ENABLED=0/g" /etc/default/motd-news
+	expect -c "
+	spawn systemctl stop motd-news.timer
+	expect 'Password:'
+		send \"$pw\\r\"
+	expect eof
+	"
+	echo -e "\n ========= motd.news disable finish !!"
+	
+}
+
+# Execute with argument options
+while [ $# -ne 0 ]
+do
+    case "$1" in
+        --version | -v)
+            echo "v1.1.0"
+			exit
+            ;;
+        --password | -p)
+			motd_news_inactive $1
+			;;
+    esac
+    shift
+done
+
+# start
+echo "=============== TmaxLinux version v4.0 to v4.1 upgrade ..."
+
+##### Modify /etc/lsb-release /etc/os-release CODENAME=artful if CODENAME=4 
+lsb_codename=`grep -w "4$" /etc/lsb-release`
+os_codename=`grep -w "4$" /etc/os-release`
+
+if [ -z $lsb_codename ]; then
+	echo "===== lsb codename is artful"
+else
+	sudo sed -i -e "s/DISTRIB_CODENAME=4/DISTRIB_CODENAME=artful/g" /etc/lsb-release
+	echo "===== lsb codename change artful"
+fi
+
+if [ -z $os_codename ]; then
+	echo "===== os codename is artful"
+else
+	sudo sed -i -e "s/VERSION_CODENAME=4/VERSION_CODENAME=artful/g" /etc/os-release
+	sudo sed -i -e "s/TMAXLINUX_CODENAME=4/TMAXLINUX_CODENAME=artful/g" /etc/os-release
+	echo "===== os codename change artful"
+fi
+
+
+
+
+echo -e "=============== Ready to version upgrade..."
+upgrade_dir=".upgrade"
+if [ -d "$upgrade_dir" ]; then
+	sudo apt-get -y remove ubuntu-release-upgrader-core > .upgrade/upgrade_log
+	sudo apt-get -y install ubuntu-release-upgrader-core > .upgrade/upgrade_log
+else
+	mkdir .upgrade
+	sudo apt-get -y remove ubuntu-release-upgrader-core > .upgrade/upgrade_log
+	sudo apt-get -y install ubuntu-release-upgrader-core > .upgrade/upgrade_log
+fi
+
+echo -e ".\c" ; sleep 1 ; echo -e ".\c" ; sleep 1 ; echo -e "."
+
+## it will be removed upgrade_log
+#sudo rm -f upgrade_log
+
+
+## do-release-upgrade 
+## checking if upgradable. if it is already upgrade, then modify services
+echo -e "=============== << 1 >> version upgrading start..."
+do_result=`do-release-upgrade -c`
+if [[ "$do_result" =~ "No new release found." ]]; then
+	echo -e "\n=============== << 1 >> version upgrading finished !!"
+else
+	while true; do
+		echo -e "version check(c) version upgrade(u) exit(x)"
+		read options
+		if [ "$options" = "c" ]; then
+			do-release-upgrade -c
+		elif [ "$options" = "u" ]; then
+			do-release-upgrade
+			break
+		elif [ "$options" = "x" ]; then
+			exit 9
+		else
+			echo "Wrong options"
+		fi
+	done
+fi
+
+### If it is upgraded, then will reboot
+### So run "version_upgrade" one more time.
+
+#############################################################################################################
+echo -e "\n=============== << 2 >> version upgrading start..."
+sleep 1
+
+file_os="/etc/os-release.prev"
+file_lsb="/etc/lsb-release.prev"
+
+## file version checking and modifying
+if [ ! -f "$file_os" ];then
+	sudo cp /etc/os-release /etc/os-release.prev &&
+	sudo cp /etc/lsb-release /etc/lsb-release.prev
+
+	error $? 1
+
+	echo 'NAME="TmaxLinux"
+VERSION="TmaxLinux 4.1.1 (Bionic Beaver)"
+ID=tmaxlinux
+ID_LIKE=debian
+PRETTY_NAME="TmaxLinux 4.1.1"
+VERSION_ID="4.1.1"
+VERSION_CODENAME=bionic
+TMAXLINUX_CODENAME=bionic' >> $HOME/os-release
+
+	echo 'DISTRIB_ID=Tmaxlinux
+DISTRIB_RELEASE=4.1.1
+DISTRIB_CODENAME=bionic
+DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
+
+	sudo mv $HOME/os-release /etc/os-release
+	sudo mv $HOME/lsb-release /etc/lsb-release
+
+	error $? 1
+
+	sudo cp /etc/issue /etc/issue.prev &&
+	sudo cp /etc/issue.net /etc/issue.net.prev
+
+	error $? 1
+
+	sudo echo 'TmaxLinux 4.1.1 \n \l' >> $HOME/issue
+	sudo echo 'TmaxLinux 4.1.1' >> $HOME/issue.net
+
+	sudo mv $HOME/issue /etc/issue
+	sudo mv $HOME/issue.net /etc/issue.net
+
+	error $? 1
+	echo -e "\n=============== << 2 >> version upgrading finished !!"
+else
+	echo -e "\n=============== << 2 >> version upgrading finished !!"
+fi
+
+
+## installing prozone packages
+while true; do
+	echo -e "\n=============== Do you want to install prozone packages? [y/n]"
+	read answer
+
+	if [ "$answer" = "y" ]; then
+		echo -e "\n=============== Install prozone packages ..."
+		sleep 1
+		echo "..."
+
+		sudo apt-get -y install vim gcc g++ libstdc++5 libaio1 libaio-dev unzip openssh-server openssh-client sshpass net-tools websockify python3 expect socat flex awscli curl procmail software-properties-common jq bridge-utils arptables iproute2 lxc qemu-kvm genisoimage cloud-utils openvpn quota nfs-kernel-server nfs-common rpcbind xmlstarlet libvirt-bin libvirt-dev virt-viewer qemu-system-x86 qemu-block-extra python-netaddr openjdk-8-jdk
+
+		error $? 2
+
+		############################ It will be deprecated #######################
+		sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/nftables ./
+
+		cd $HOME/nftables
+		sudo dpkg -i *.deb
+
+		error $? 3
+		
+		echo -e "\n===== Nftables version"
+		nft -v
+		###########################################################################
+		break
+
+	elif [ "$answer" = "n" ]; then
+		echo -e "\n Prozone package is not installed"
+		break	
+	else
+		echo "Wrong options"
+	fi
+done
+
+## motd service enable & motd-news service remove -- deprecated
+#echo -e "\n=============== motd.service enable"
+#file="/etc/update-motd.d/50-motd-news.dpkg-dist"
+#
+#if [ -f "$file" ]; then
+#	sudo mv /etc/update-motd.d/50-motd-news.dpkg-dist /etc/update-motd.d/50-motd-news
+#	error $? 4
+#	sudo systemctl restart motd-news.service
+#	echo -e "\n=============== motd.service restart sucess"
+#fi
+
+
+##### Modify /etc/update-motd.d/10-help-text /etc/update-motd.d/10-help-text
+re_help_text=`grep -r "#printf" /etc/update-motd.d/10-help-text`
+if [ -z "$re_help_text" ]; then
+	sudo sed -i "s/printf/#printf/g" /etc/update-motd.d/10-help-text
+else
+	echo "===== no help text"
+fi
+
+landscape_file="/etc/update-motd.d/50-landscape-sysinfo"
+
+if [ -f "$landscape_file" ]; then
+	sudo rm -f /etc/update-motd.d/50-landscape-sysinfo
+else
+	echo "===== no landscape"
+fi
+
+echo -e "\n=============== motd.service finish"
+
+
+echo -e "-------------------------------------"
+echo -e "Vesion Changed finished! Please reboot the server. 
+And Check systemctl status is all running"
+exit 9
