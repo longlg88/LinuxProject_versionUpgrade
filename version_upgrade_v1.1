@@ -19,32 +19,51 @@ function error(){
 
 	if [ ${value} -ne 0 ]; then
 		echo "Error : ${str}"
-		exit 9
+		exit 1
 	fi
 }
 
 ## For motd-news.service inactive
 function motd_news_inactive(){
-	local pw=$1
-	sudo apt --fix-broken -y install > /dev/null 2>&1
-	sudo apt-get -y install expect > /dev/null
+	#local pw=$1
+	sudo apt --fix-broken -y install
+	#sudo apt-get -y install expect > /dev/null
 
 	echo -e "\n ========= motd.news disable"
 	sudo sed -i "s/ENABLED=1/ENABLED=0/g" /etc/default/motd-news
-	expect -c "
-	spawn systemctl stop motd-news.timer
-	expect 'Password:'
-		send \"$pw\\r\"
-	expect eof
-	"
-	count=`cat $HOME/.bashrc | grep "motd" | wc -w`
-	if [ $count -eq 0 ]; then
-		echo "echo $pw | sudo -S systemctl stop motd-news.timer" >> $HOME/.bashrc
-		echo "echo -e" >> $HOME/.bashrc
-	else
-		echo "Already fininsh~"
-	fi
+	file_motd_dpkg="/etc/update-motd.d/50-motd-news.dpkg-dist"
+	#file_motd="/etc/update-motd.d/50-motd-news"
 
+	exit_code_dpkg_which=`grep -r "TmaxLinux" $file_motd_dpkg`
+	#exit_code_which=`grep -r "TmaxLinux" $file_motd`
+
+	#if [ -a $file_motd ]; then
+	#	if [[ "$exit_code_which" =~ [TmaxLinux] ]]; then
+	#		echo "exists"
+	#	else
+	#		sed -i 's/# Source the local configuration/# Source the local configuration\n# TmaxLinux exit code\nexit 0/g' $file_motd
+	#	fi
+	if [ -a $file_motd_dpkg ]; then
+		if [[ "$exit_code_dpkg_which" =~ [TmaxLinux] ]]; then 
+            echo "There is exit code here"
+        else
+            sudo sed -i 's/# Source the local configuration/# Source the local configuration\n# TmaxLinux exit code\nexit 0/g' $file_motd_dpkg
+        fi
+	else
+		echo "There is no motd service"
+		exit 1
+	fi
+		
+
+	# Will be deprecated	
+	#expect -c "
+	#spawn systemctl disable motd-news.timer
+	#expect 'Password:'
+	#		send \"$pw\\r\"
+	#	expect 'Password:'
+	#		send \"$pw\\r\"
+	#	expect eof
+	#	"
 	echo -e "\n ========= motd.news disable finish !!"
 }
 
@@ -67,25 +86,64 @@ OPTION:
 END
 }
 
+function kernel_upgrade(){
+	local pw=$1
+	wget -c http://175.195.163.6:8080/k_modules/kernel_modules-4.18.10-3-generic.tar
+	stdout=`echo $?`
+	if [ $stdout -eq 0 ]; then
+		tar -xvf kernel_modules-4.18.10-3-generic.tar 
+		echo $pw | sudo -S dpkg -i $PWD/kernel_modules-4.18.10-3-generic/*.deb
+		cp $PWD/kernel_modules-4.18.10-3-generic/*.ko /lib/modules/4.18.10-3-generic/kernel/fs/
+		
+		echo -e
+		echo -e "*** You will reboot... then it will choice kernel 4.18.10-3-generic ***"
+		echo -e "*** After reboot ***"
+		echo -e "*** Run version_upgrade one more time ***"
+		exit 0
+	else
+		echo "Error to get kernel modules packages..."
+		exit 1
+	fi
+}
+
+function mkdir_upgrade_log(){
+	DATE=`date "+%Y %m/%d %H:%M:%S"`
+    upgrade_dir=".upgrade"
+    
+    if [ -d "$upgrade_dir" ]; then
+        echo -e "=================================== $DATE ==================================" 
+        echo -e "Ready!!" 
+    else
+        mkdir .upgrade
+        echo -e "=================================== $DATE ==================================" 
+        echo -e "Ready!!" 
+    fi
+
+}
+
+function log_manage(){
+	fileDATE=`date "+%Y%m%d_%H%M"`
+	mv .upgrade/upgrade_log .upgrade/upgrade_log_$fileDATE
+}
+
 ## start upgrade function
 function start_upgrade(){
-	DATE=`date "+%Y %m/%d %H:%M:%S"`
-	upgrade_dir=".upgrade"
+	local pw=$1
     
-	if [ -d "$upgrade_dir" ]; then
-		echo -e "=================================== $DATE ==================================" 
-		echo -e "Ready!!" 
+	uname=`uname -r`
+	echo "This kernel is "$uname
+
+	kernel_dir="/lib/modules/4.18.10-3-generic"
+	if [ -d "$kernel_dir" ]; then
+		echo -e "=============== Kernel already upgrade !!"
 	else
-		mkdir .upgrade
-		echo -e "=================================== $DATE ==================================" 
-		echo -e "Ready!!" 
+		kernel_upgrade $pw
 	fi
 
-	local pw=$1
 	if [ -z ${pw} ]; then
 		echo -e 
 		echo -e "Enter password for using authentication for service!!" 
-		exit 9
+		exit 1
 	fi
 
 	# start
@@ -98,14 +156,14 @@ function start_upgrade(){
 	if [ -z $lsb_codename ]; then
 		echo "===== lsb codename is artful" 
 	else
-		sudo sed -i -e "s/DISTRIB_CODENAME=4/DISTRIB_CODENAME=artful/g" /etc/lsb-release
+		echo $pw | sudo -S sed -i -e "s/DISTRIB_CODENAME=4/DISTRIB_CODENAME=artful/g" /etc/lsb-release
 		echo "===== lsb codename change artful"
 	fi
 
 	if [ -z $os_codename ]; then
 		echo "===== os codename is artful"
 	else
-		sudo sed -i -e "s/VERSION_CODENAME=4/VERSION_CODENAME=artful/g" /etc/os-release
+		echo $pw | sudo -S sed -i -e "s/VERSION_CODENAME=4/VERSION_CODENAME=artful/g" /etc/os-release
 		sudo sed -i -e "s/TMAXLINUX_CODENAME=4/TMAXLINUX_CODENAME=artful/g" /etc/os-release
 		echo "===== os codename change artful"
 	fi
@@ -114,11 +172,21 @@ function start_upgrade(){
 
 
 	echo -e "=============== Ready to version upgrade"
-	sudo apt --fix-broken -y install > /dev/null 2>&1
-	sudo apt-get -y remove update-manager-core > /dev/null
-	sudo apt-get -y install ubuntu-server > /dev/null
-	sudo apt-get -y install update-manager-core > /dev/null
-	sudo apt-get -y install update-notifier-common > /dev/null
+	echo $pw | sudo -S apt --fix-broken -y install > /dev/null 2>&1
+
+	exist_ubuntu_manager_core=`apt list --installed 2>&1 | grep ubuntu-release-upgrader-core | awk -F / '{ print $1 }'`
+	if [ -z $exist_ubuntu_manager_core ]; then
+		echo $pw | sudo -S apt-get -y remove update-manager-core
+		sudo apt-get -y install ubuntu-server
+		sudo apt-get -y install update-manager-core
+		sudo apt-get -y install update-notifier-common
+	else
+		echo $pw | sudo -S apt-get -y remove ubuntu-release-upgrader-core
+		sudo apt-get -y install ubuntu-release-upgrader-core
+        sudo apt-get -y install ubuntu-server
+        sudo apt-get -y install update-manager-core
+        sudo apt-get -y install update-notifier-common
+	fi
 	## will be deprecated
 	#sudo apt-get -y remove ubuntu-release-upgrader-core > /dev/null 
 	#sudo apt-get -y install ubuntu-release-upgrader-core > /dev/null
@@ -136,6 +204,8 @@ function start_upgrade(){
 	if [[ "$do_result" =~ "No new release found." ]]; then
 		echo -e "\n=============== << 1 >> version upgrading finished !!"
 	else
+		echo -e "If it is upgraded, then will reboot"
+		echo -e "So run this program ** one more time. **"
 		while true; do
 			echo -e "version check(c) version upgrade(u) exit(x)"
 			read options
@@ -145,17 +215,14 @@ function start_upgrade(){
 				do-release-upgrade
 				break
 			elif [ "$options" = "x" ]; then
-				exit 9
+				exit 0
 			else
 				echo "Wrong options"
 			fi
 		done
 	fi
 	
-	### If it is upgraded, then will reboot
-	### So run "version_upgrade" one more time.
-	
-	#############################################################################################################
+	########################################################################################
 	echo -e "\n=============== << 2 >> version upgrading start..."
 	sleep 1
 	
@@ -216,20 +283,20 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 			sleep 1
 			echo "..."
 
-			sudo apt-get -y install vim gcc g++ libstdc++5 libaio1 libaio-dev unzip openssh-server openssh-client sshpass net-tools websockify python3 expect socat flex awscli curl procmail software-properties-common jq bridge-utils arptables iproute2 lxc qemu-kvm genisoimage cloud-utils openvpn quota nfs-kernel-server nfs-common rpcbind xmlstarlet libvirt-bin libvirt-dev virt-viewer qemu-system-x86 qemu-block-extra python-netaddr openjdk-8-jdk > /dev/null
+			sudo apt-get -y install vim gcc g++ libstdc++5 libaio1 libaio-dev unzip openssh-server openssh-client sshpass net-tools websockify python3 expect socat flex awscli curl procmail software-properties-common jq bridge-utils arptables iproute2 lxc qemu-kvm genisoimage cloud-utils openvpn quota nfs-kernel-server nfs-common rpcbind xmlstarlet libvirt-bin libvirt-dev virt-viewer qemu-system-x86 qemu-block-extra python-netaddr openjdk-8-jdk
 
 			error $? 2
 
-			############################ It will be deprecated #######################
-			sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/nftables ./
+			############################ Will be deprecated #######################
+			#sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/nftables ./
 
-			cd $HOME/nftables
-			sudo dpkg -i *.deb
+			#cd $HOME/nftables
+			#sudo dpkg -i *.deb
 
-			error $? 3
+			#error $? 3
 		
-			echo -e "\n===== Nftables version"
-			nft -v
+			#echo -e "\n===== Nftables version"
+			#nft -v
 			###########################################################################
 			break
 
@@ -263,11 +330,11 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 
 	## Install TmaxLinux Mono package
 	while true; do
-		echo -e "\n=============== Do you want to install TmaxLinux mono packages? [y/n]"
+		echo -e "\n=============== Do you want to install Mono packages? [y/n]"
 		read mono_answer
 
 		if [ "$mono_answer" = "y" ]; then
-			echo -e "Install TmaxLinux mono package...\n"
+			echo -e "Install Mono package...\n"
 			sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/LinuxProject_versionUpgrade/mono/ ./ > /dev/null
 			touch $HOME/.upgrade/mono_log
 			cd $PWD/mono
@@ -276,7 +343,7 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 			mono --version
 			break
 		elif [ "$mono_answer" = "n" ]; then
-			echo -e "\n TmaxLinux mono package is not installed"
+			echo -e "\n Mono package is not installed"
 			break
 		else
 			echo "Wrong options"
@@ -302,13 +369,16 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 
 	echo -e "\n=============== motd.service finish"
 	
-	motd_news_inactive $pw
+	#motd_news_inactive $pw
+	motd_news_inactive
 
 	echo -e "-------------------------------------"
 	echo -e "Vesion Changed finished! Please reboot the server. 
 	And Check systemctl status is all running"
-	exit 9
+	log_manage
+	exit 0
 }
+
 # Execute with argument options
 while [ $# -ne 0 ]
 do
@@ -323,7 +393,8 @@ do
 			exit
 			;;
         --password | -p)
-			start_upgrade $2
+			mkdir_upgrade_log
+			start_upgrade $2 | tee .upgrade/upgrade_log
 			exit
 			;;
 		*)
