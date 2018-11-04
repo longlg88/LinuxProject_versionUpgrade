@@ -1,5 +1,14 @@
 #!/bin/bash
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[36m'
+BLUE='\033]0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+
+
 # error function uses for handling common error cases
 function error(){
 	local value=$1
@@ -18,7 +27,7 @@ function error(){
 	fi
 
 	if [ ${value} -ne 0 ]; then
-		echo "Error : ${str}"
+		echo -e $RED"Error : ${str}"$NC
 		exit 1
 	fi
 }
@@ -29,7 +38,7 @@ function motd_news_inactive(){
 	sudo apt --fix-broken -y install
 	#sudo apt-get -y install expect > /dev/null
 
-	echo -e "\n ========= motd.news disable"
+	echo -e $CYAN"\n ========= motd.news disable"$NC
 	sudo sed -i "s/ENABLED=1/ENABLED=0/g" /etc/default/motd-news
 	file_motd_dpkg="/etc/update-motd.d/50-motd-news.dpkg-dist"
 	#file_motd="/etc/update-motd.d/50-motd-news"
@@ -45,12 +54,12 @@ function motd_news_inactive(){
 	#	fi
 	if [ -a $file_motd_dpkg ]; then
 		if [[ "$exit_code_dpkg_which" =~ [TmaxLinux] ]]; then 
-            echo "There is exit code here"
+            echo $CYAN"There is exit code here"$NC
         else
             sudo sed -i 's/# Source the local configuration/# Source the local configuration\n# TmaxLinux exit code\nexit 0/g' $file_motd_dpkg
         fi
 	else
-		echo "There is no motd service"
+		echo $RED"There is no motd service"$NC
 		exit 1
 	fi
 		
@@ -64,7 +73,7 @@ function motd_news_inactive(){
 	#		send \"$pw\\r\"
 	#	expect eof
 	#	"
-	echo -e "\n ========= motd.news disable finish !!"
+	$CYANecho -e "\n ========= motd.news disable finish !!"$NC
 }
 
 # help menu
@@ -92,16 +101,26 @@ function kernel_upgrade(){
 	stdout=`echo $?`
 	if [ $stdout -eq 0 ]; then
 		tar -xvf kernel_modules-4.18.10-3-generic.tar 
-		echo $pw | sudo -S dpkg -i $PWD/kernel_modules-4.18.10-3-generic/*.deb
-		cp $PWD/kernel_modules-4.18.10-3-generic/*.ko /lib/modules/4.18.10-3-generic/kernel/fs/
-		
-		echo -e
-		echo -e "*** You will reboot... then it will choice kernel 4.18.10-3-generic ***"
-		echo -e "*** After reboot ***"
-		echo -e "*** Run version_upgrade one more time ***"
-		exit 0
+		echo $pw | sudo -S -k dpkg -i $PWD/kernel_modules-4.18.10-3-generic/*.deb
+		stdout_dpkg=`echo $?`
+		if [ $stdout_dpkg -eq 1 ]; then
+			echo -e $RED"Wrong password"$NC
+			exit 1
+		else
+			sudo -S cp $PWD/kernel_modules-4.18.10-3-generic/*.ko /lib/modules/4.18.10-3-generic/kernel/fs/
+			stdout_copy=`echo $?`
+			if [ $stdout_copy -eq 1 ]; then
+				echo -e $RED"Error to get kernel modules packages..."$NC
+				exit 1
+			fi
+			echo -e
+			echo -e $CYAN"*** You will reboot... then it will choice kernel 4.18.10-3-generic ***"$NC
+			echo -e $CYAN"*** After reboot ***"$NC
+			echo -e $CYAN"*** Run version_upgrade one more time ***"$NC
+			exit 0
+		fi
 	else
-		echo "Error to get kernel modules packages..."
+		echo $RED"Error to get kernel modules packages..."$NC
 		exit 1
 	fi
 }
@@ -111,12 +130,12 @@ function mkdir_upgrade_log(){
     upgrade_dir=".upgrade"
     
     if [ -d "$upgrade_dir" ]; then
-        echo -e "=================================== $DATE ==================================" 
-        echo -e "Ready!!" 
+        echo -e $CYAN"=================================== $DATE =================================="$NC
+        echo -e $CYAN"Ready!!"$NC
     else
         mkdir .upgrade
-        echo -e "=================================== $DATE ==================================" 
-        echo -e "Ready!!" 
+        echo -e $CYAN"=================================== $DATE =================================="$NC
+        echo -e $CYAN"Ready!!"$NC
     fi
 
 }
@@ -129,49 +148,48 @@ function log_manage(){
 ## start upgrade function
 function start_upgrade(){
 	local pw=$1
-    
 	uname=`uname -r`
-	echo "This kernel is "$uname
+	echo -e $YELLOW"This kernel is "$uname $NC
 
 	kernel_dir="/lib/modules/4.18.10-3-generic"
 	if [ -d "$kernel_dir" ]; then
-		echo -e "=============== Kernel already upgrade !!"
+		echo -e $CYAN"=============== Kernel already upgrade !!"$NC
 	else
 		kernel_upgrade $pw
 	fi
 
 	if [ -z ${pw} ]; then
 		echo -e 
-		echo -e "Enter password for using authentication for service!!" 
+		echo -e $RED"Enter password for using authentication for service!!"$NC
 		exit 1
 	fi
 
 	# start
-	echo "=============== TmaxLinux version v4.0 to v4.1 upgrade ..." 
+	echo -e $CYAN"=============== TmaxLinux version v4.0 to v4.1 upgrade ..."$NC
 
 	##### Modify /etc/lsb-release /etc/os-release CODENAME=artful if CODENAME=4 
 	lsb_codename=`grep -w "4$" /etc/lsb-release`
 	os_codename=`grep -w "4$" /etc/os-release`
 
 	if [ -z $lsb_codename ]; then
-		echo "===== lsb codename is artful" 
+		echo -e $CYAN"===== lsb codename is artful"$NC
 	else
 		echo $pw | sudo -S sed -i -e "s/DISTRIB_CODENAME=4/DISTRIB_CODENAME=artful/g" /etc/lsb-release
-		echo "===== lsb codename change artful"
+		echo -e $CYAN"===== lsb codename change artful"$NC
 	fi
 
 	if [ -z $os_codename ]; then
-		echo "===== os codename is artful"
+		echo -e $CYAN"===== os codename is artful"$NC
 	else
 		echo $pw | sudo -S sed -i -e "s/VERSION_CODENAME=4/VERSION_CODENAME=artful/g" /etc/os-release
 		sudo sed -i -e "s/TMAXLINUX_CODENAME=4/TMAXLINUX_CODENAME=artful/g" /etc/os-release
-		echo "===== os codename change artful"
+		echo -e $CYAN"===== os codename change artful"$NC
 	fi
 
 
 
 
-	echo -e "=============== Ready to version upgrade"
+	echo -e $CYAN"=============== Ready to version upgrade"$NC
 	echo $pw | sudo -S apt --fix-broken -y install > /dev/null 2>&1
 
 	exist_ubuntu_manager_core=`apt list --installed 2>&1 | grep ubuntu-release-upgrader-core | awk -F / '{ print $1 }'`
@@ -191,7 +209,7 @@ function start_upgrade(){
 	#sudo apt-get -y remove ubuntu-release-upgrader-core > /dev/null 
 	#sudo apt-get -y install ubuntu-release-upgrader-core > /dev/null
 	
-	echo -e ".\c" ; sleep 1 ; echo -e ".\c" ; sleep 1 ; echo -e "."
+	echo -e $CYAN".\c" ; sleep 1 ; echo -e ".\c" ; sleep 1 ; echo -e "."$NC
 	
 	## it will be removed upgrade_log
 	#sudo rm -f upgrade_log
@@ -199,15 +217,15 @@ function start_upgrade(){
 
 	## do-release-upgrade 
 	## checking if upgradable. if it is already upgrade, then modify services
-	echo -e "=============== << 1 >> version upgrading start..."
+	echo -e $CYAN"=============== << 1 >> version upgrading start..."$NC
 	do_result=`do-release-upgrade -c`
 	if [[ "$do_result" =~ "No new release found." ]]; then
-		echo -e "\n=============== << 1 >> version upgrading finished !!"
+		echo -e $CYAN"\n=============== << 1 >> version upgrading finished !!"$NC
 	else
-		echo -e "If it is upgraded, then will reboot"
-		echo -e "So run this program ** one more time. **"
+		echo -e $CYAN"If it is upgraded, then will reboot"$NC
+		echo -e $CYAN"So run this program ** one more time. **"$NC
 		while true; do
-			echo -e "version check(c) version upgrade(u) exit(x)"
+			echo -e $CYAN"version check(c) version upgrade(u) exit(x)"$NC
 			read options
 			if [ "$options" = "c" ]; then
 				do-release-upgrade -c
@@ -217,13 +235,13 @@ function start_upgrade(){
 			elif [ "$options" = "x" ]; then
 				exit 0
 			else
-				echo "Wrong options"
+				echo -e $RED"Wrong options"$NC
 			fi
 		done
 	fi
 	
 	########################################################################################
-	echo -e "\n=============== << 2 >> version upgrading start..."
+	echo -e $CYAN"\n=============== << 2 >> version upgrading start..."$NC
 	sleep 1
 	
 	file_os="/etc/os-release.prev"
@@ -234,7 +252,7 @@ function start_upgrade(){
 		sudo cp /etc/os-release /etc/os-release.prev &&
 		sudo cp /etc/lsb-release /etc/lsb-release.prev
 
-		error $? 1
+		error $? 
 
 		echo 'NAME="TmaxLinux"
 VERSION="TmaxLinux 4.1.1 (Bionic Beaver)"
@@ -267,19 +285,19 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 		sudo mv $HOME/issue.net /etc/issue.net
 
 		error $? 1
-		echo -e "\n=============== << 2 >> version upgrading finished !!"
+		echo -e $CYAN"\n=============== << 2 >> version upgrading finished !!"$NC
 	else
-		echo -e "\n=============== << 2 >> version upgrading finished !!"
+		echo -e $CYAN"\n=============== << 2 >> version upgrading finished !!"$NC
 	fi
 	
 
 	## installing prozone packages
 	while true; do
-		echo -e "\n=============== Do you want to install prozone packages? [y/n]"
+		echo -e $CYAN"\n=============== Do you want to install prozone packages? [y/n]"$NC
 		read answer
 
 		if [ "$answer" = "y" ]; then
-			echo -e "\n=============== Install prozone packages ..."
+			echo -e $CYAN"\n=============== Install prozone packages ..."$NC
 			sleep 1
 			echo "..."
 
@@ -301,11 +319,11 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 			break
 
 		elif [ "$answer" = "n" ]; then
-			echo -e "\n Prozone package is not installed"
+			echo -e $CYAN"\n Prozone package is not installed"$NC
 			echo -e
 			break	
 		else
-			echo "Wrong options"
+			echo $RED"Wrong options"$NC
 		fi
 	done
 
@@ -325,16 +343,16 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 	echo -e "=============== Remove Prozone repository IP... "
 	sudo sed -i "s/\# This is Prozone repository (TmaxLinux)//g" /etc/apt/sources.list
 	sudo sed -i "s/# deb \[arch=amd64\] http:\/\/175.195.163.192:8080\/tmax_repo\/prozone artful main//g" /etc/apt/sources.list
-	echo -e "=============== Remove Prozone repository IP finish"
+	echo -e $CYAN"=============== Remove Prozone repository IP finish"$NC
 
 
 	## Install TmaxLinux Mono package
 	while true; do
-		echo -e "\n=============== Do you want to install Mono packages? [y/n]"
+		echo -e $CYAN"\n=============== Do you want to install Mono packages? [y/n]"$NC
 		read mono_answer
 
 		if [ "$mono_answer" = "y" ]; then
-			echo -e "Install Mono package...\n"
+			echo -e $CYAN"Install Mono package...\n"$NC
 			sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/LinuxProject_versionUpgrade/mono/ ./ > /dev/null
 			touch $HOME/.upgrade/mono_log
 			cd $PWD/mono
@@ -343,10 +361,10 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 			mono --version
 			break
 		elif [ "$mono_answer" = "n" ]; then
-			echo -e "\n Mono package is not installed"
+			echo -e $CYAN"\n Mono package is not installed"$NC
 			break
 		else
-			echo "Wrong options"
+			echo -e $RED"Wrong options"$NC
 		fi
 	done
 
@@ -356,7 +374,7 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 	if [ -z "$re_help_text" ]; then
 		sudo sed -i "s/printf/#printf/g" /etc/update-motd.d/10-help-text
 	else
-		echo "===== no help text"
+		echo -e $CYAN"===== no help text"$NC
 	fi
 
 	landscape_file="/etc/update-motd.d/50-landscape-sysinfo"
@@ -364,17 +382,17 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 	if [ -f "$landscape_file" ]; then
 		sudo rm -f /etc/update-motd.d/50-landscape-sysinfo
 	else
-		echo "===== no landscape"
+		echo -e $CYAN"===== no landscape"$NC
 	fi
 
-	echo -e "\n=============== motd.service finish"
+	echo -e $CYAN"\n=============== motd.service finish"$NC
 	
 	#motd_news_inactive $pw
 	motd_news_inactive
 
-	echo -e "-------------------------------------"
-	echo -e "Vesion Changed finished! Please reboot the server. 
-	And Check systemctl status is all running"
+	echo -e $CYAN"-------------------------------------"$NC
+	echo -e $YELLOW"Vesion Changed finished! Please reboot the server. 
+	And Check systemctl status is all running"$NC
 	log_manage
 	exit 0
 }
@@ -398,7 +416,7 @@ do
 			exit
 			;;
 		*)
-			echo "Wrong parameter enter... use -h, --help option to read help"
+			echo -e $RED"Wrong parameter enter... use -h, --help option to read help"$NC
 			exit 1
 			;;
     esac
@@ -406,7 +424,7 @@ do
 done
 
 if [ $# -eq 0 ]; then
-	echo "Wrong parameter enter... use -h, --help option to read help"
+	echo -e $RED"Wrong parameter enter... use -h, --help option to read help"$NC
 	exit 1
 fi
 
