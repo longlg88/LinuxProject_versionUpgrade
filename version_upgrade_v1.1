@@ -34,11 +34,11 @@ function error(){
 ## For motd-news.service inactive
 function motd_news_inactive(){
 	#local pw=$1
-	sudo apt --fix-broken -y install
-	#sudo apt-get -y install expect > /dev/null
+	echo $pw | sudo -S apt --fix-broken -y install
+	#echo $pw | sudo -S apt-get -y install expect > /dev/null
 
-	echo -e $CYAN"\n ========= motd.news disable"$NC
-	sudo sed -i "s/ENABLED=1/ENABLED=0/g" /etc/default/motd-news
+	echo -e $CYAN"\n========= motd.news disable"$NC
+	echo $pw | sudo -S sed -i "s/ENABLED=1/ENABLED=0/g" /etc/default/motd-news
 	file_motd_dpkg="/etc/update-motd.d/50-motd-news.dpkg-dist"
 	#file_motd="/etc/update-motd.d/50-motd-news"
 
@@ -53,26 +53,16 @@ function motd_news_inactive(){
 	#	fi
 	if [ -a $file_motd_dpkg ]; then
 		if [[ "$exit_code_dpkg_which" =~ [TmaxLinux] ]]; then 
-            echo $CYAN"There is exit code here"$NC
+            echo -e $CYAN"There is exit code here"$NC
         else
-            sudo sed -i 's/# Source the local configuration/# Source the local configuration\n# TmaxLinux exit code\nexit 0/g' $file_motd_dpkg
+            echo $pw | sudo -S sed -i 's/# Source the local configuration/# Source the local configuration\n# TmaxLinux exit code\nexit 0/g' $file_motd_dpkg
         fi
 	else
 		echo $RED"There is no motd service"$NC
 		exit 1
 	fi
-		
 
-	# Will be deprecated	
-	#expect -c "
-	#spawn systemctl disable motd-news.timer
-	#expect 'Password:'
-	#		send \"$pw\\r\"
-	#	expect 'Password:'
-	#		send \"$pw\\r\"
-	#	expect eof
-	#	"
-	$CYANecho -e "\n ========= motd.news disable finish !!"$NC
+	echo -e $CYAN"\n========= motd.news disable finish !!"$NC
 }
 
 # help menu
@@ -94,55 +84,110 @@ OPTION:
 END
 }
 
+## kernel upgrading which download at tmaxlinux repository
 function kernel_upgrade(){
 	local pw=$1
-	wget -c http://175.195.163.6:8080/k_modules/kernel_modules-4.18.10-3-generic.tar
+
+	wget -c http://tmaxlinux-repo.tmaxos.com/k_modules/kernel_modules-4.18.10-3-generic.tar
 	stdout=`echo $?`
 	if [ $stdout -eq 0 ]; then
 		tar -xvf kernel_modules-4.18.10-3-generic.tar 
-		echo $pw | sudo -S -k dpkg -i $PWD/kernel_modules-4.18.10-3-generic/*.deb
-		stdout_dpkg=`echo $?`
-		if [ $stdout_dpkg -eq 1 ]; then
-			echo -e $RED"Wrong password"$NC
+		echo $pw | sudo -S dpkg -i $PWD/kernel_modules-4.18.10-3-generic/*.deb
+		echo $pw | sudo -S cp $PWD/kernel_modules-4.18.10-3-generic/*.ko /lib/modules/4.18.10-3-generic/kernel/fs/
+		stdout_copy=`echo $?`
+		if [ $stdout_copy -eq 1 ]; then
+			echo -e $RED"Error to get kernel modules packages..."$NC
 			exit 1
-		else
-			sudo -S cp $PWD/kernel_modules-4.18.10-3-generic/*.ko /lib/modules/4.18.10-3-generic/kernel/fs/
-			stdout_copy=`echo $?`
-			if [ $stdout_copy -eq 1 ]; then
-				echo -e $RED"Error to get kernel modules packages..."$NC
-				exit 1
-			fi
-			echo -e
-			echo -e $CYAN"*** You will reboot... then it will choice kernel 4.18.10-3-generic ***"$NC
-			echo -e $CYAN"*** After reboot ***"$NC
-			echo -e $CYAN"*** Run version_upgrade one more time ***"$NC
-			exit 0
 		fi
+		echo -e
+		echo -e $CYAN"*** You will reboot... then it will choice kernel 4.18.10-3-generic ***"$NC
+		echo -e $CYAN"*** After reboot ***"$NC
+		echo -e $CYAN"*** Run version_upgrade one more time ***"$NC
+		exit 0
 	else
 		echo $RED"Error to get kernel modules packages..."$NC
 		exit 1
 	fi
 }
 
+
+## making directory for using log
 function mkdir_upgrade_log(){
 	DATE=`date "+%Y %m/%d %H:%M:%S"`
     upgrade_dir=".upgrade"
     
     if [ -d "$upgrade_dir" ]; then
         echo -e $CYAN"=================================== $DATE =================================="$NC
-        echo -e $CYAN"Ready!!"$NC
+        echo -e $CYAN"Ready!!\n"$NC
     else
         mkdir .upgrade
         echo -e $CYAN"=================================== $DATE =================================="$NC
-        echo -e $CYAN"Ready!!"$NC
+        echo -e $CYAN"Ready!!\n"$NC
     fi
 
 }
 
+## log manage
 function log_manage(){
 	fileDATE=`date "+%Y%m%d_%H%M"`
 	mv .upgrade/upgrade_log .upgrade/upgrade_log_$fileDATE
 }
+
+## upgrade artful -> bionic logic
+function do_release_upgrade(){
+	echo -e $CYAN"=============== Ready to version upgrade"$NC
+    echo $pw | sudo -S apt --fix-broken -y install > /dev/null 2>&1
+
+    exist_ubuntu_manager_core=`apt list --installed 2>&1 | grep ubuntu-release-upgrader-core | awk -F / '{ print $1 }'`
+    if [ -z $exist_ubuntu_manager_core ]; then
+        echo $pw | sudo -S apt-get -y remove update-manager-core
+        echo $pw | sudo -S apt-get -y install ubuntu-server
+        echo $pw | sudo -S apt-get -y install update-manager-core
+        echo $pw | sudo -S apt-get -y install update-notifier-common
+    else
+        echo $pw | sudo -S apt-get -y remove ubuntu-release-upgrader-core
+        echo $pw | sudo -S apt-get -y install ubuntu-release-upgrader-core
+        echo $pw | sudo -S apt-get -y install ubuntu-server
+        echo $pw | sudo -S apt-get -y install update-manager-core
+        echo $pw | sudo -S apt-get -y install update-notifier-common
+    fi
+    ## will be deprecated
+    #echo $pw | sudo -S apt-get -y remove ubuntu-release-upgrader-core > /dev/null 
+    #echo $pw | sudo -S apt-get -y install ubuntu-release-upgrader-core > /dev/null
+
+    echo -e $CYAN".\c" ; sleep 1 ; echo -e ".\c" ; sleep 1 ; echo -e "."$NC
+
+    ## it will be removed upgrade_log
+    #echo $pw | sudo -S rm -f upgrade_log
+
+
+    ## do-release-upgrade 
+    ## checking if upgradable. if it is already upgrade, then modify services
+    echo -e $CYAN"=============== << 1 >> version upgrading start..."$NC
+    do_result=`do-release-upgrade -c`
+    if [[ "$do_result" =~ "No new release found." ]]; then
+        echo -e $CYAN"\n=============== << 1 >> version upgrading finished !!"$NC
+    else
+        echo -e $CYAN"If it is upgraded, then will reboot"$NC
+        echo -e $CYAN"So run this program ** one more time. **"$NC
+        while true; do
+            echo -e $CYAN"version check(c) version upgrade(u) exit(x)"$NC
+            read options
+            if [ "$options" = "c" ]; then
+                do-release-upgrade -c
+            elif [ "$options" = "u" ]; then
+                do-release-upgrade
+                break
+            elif [ "$options" = "x" ]; then
+                exit 0
+            else
+                echo -e $RED"Wrong options"$NC
+            fi
+        done
+    fi
+}
+
+
 
 ## start upgrade function
 function start_upgrade(){
@@ -150,9 +195,33 @@ function start_upgrade(){
 	uname=`uname -r`
 	echo -e $YELLOW"This kernel is "$uname $NC
 
+	## root password checking
+	
+	echo $pw | sudo -S -k touch .upgrade/confirm
+	stdout_pw_1=`echo $?`
+	if [ "$stdout_pw_1" -eq 0 ]; then
+	    echo $pw | sudo -S rm -f .upgrade/confirm
+		stdout_pw_2=`echo $?`
+		if [ "$stdout_pw_2" -eq 0 ]; then
+			echo -e $CYAN"confirmed!"$NC
+		else
+			echo -e $RED"Password is wrong. Check for it."$NC
+			exit 1
+		fi
+	else
+		echo -e $RED"Password is wrong. Check for it."$NC
+        exit 1
+	fi
+
+
 	kernel_dir="/lib/modules/4.18.10-3-generic"
+	kernel_release=`uname -r`
 	if [ -d "$kernel_dir" ]; then
-		echo -e $CYAN"=============== Kernel already upgrade !!"$NC
+		if [ "$kernel_release" = "4.18.10-3-generic" ]; then
+			echo -e $CYAN"=============== Kernel already upgrade !!"$NC
+		else
+			kernel_upgrade $pw
+		fi
 	else
 		kernel_upgrade $pw
 	fi
@@ -169,76 +238,33 @@ function start_upgrade(){
 	##### Modify /etc/lsb-release /etc/os-release CODENAME=artful if CODENAME=4 
 	lsb_codename=`grep -w "4$" /etc/lsb-release`
 	os_codename=`grep -w "4$" /etc/os-release`
-
+	check_codename=`grep -r "VERSION_CODENAME" /etc/os-release | awk -F= '{ print $2 }'`
+	
 	if [ -z $lsb_codename ]; then
-		echo -e $CYAN"===== lsb codename is artful"$NC
+		echo -e $CYAN"===== lsb codename is $check_codename"$NC
 	else
 		echo $pw | sudo -S sed -i -e "s/DISTRIB_CODENAME=4/DISTRIB_CODENAME=artful/g" /etc/lsb-release
 		echo -e $CYAN"===== lsb codename change artful"$NC
 	fi
 
 	if [ -z $os_codename ]; then
-		echo -e $CYAN"===== os codename is artful"$NC
+		echo -e $CYAN"===== os codename is $check_codename"$NC
 	else
 		echo $pw | sudo -S sed -i -e "s/VERSION_CODENAME=4/VERSION_CODENAME=artful/g" /etc/os-release
-		sudo sed -i -e "s/TMAXLINUX_CODENAME=4/TMAXLINUX_CODENAME=artful/g" /etc/os-release
+		echo $pw | sudo -S sed -i -e "s/TMAXLINUX_CODENAME=4/TMAXLINUX_CODENAME=artful/g" /etc/os-release
 		echo -e $CYAN"===== os codename change artful"$NC
 	fi
 
-
-
-
-	echo -e $CYAN"=============== Ready to version upgrade"$NC
-	echo $pw | sudo -S apt --fix-broken -y install > /dev/null 2>&1
-
-	exist_ubuntu_manager_core=`apt list --installed 2>&1 | grep ubuntu-release-upgrader-core | awk -F / '{ print $1 }'`
-	if [ -z $exist_ubuntu_manager_core ]; then
-		echo $pw | sudo -S apt-get -y remove update-manager-core
-		sudo apt-get -y install ubuntu-server
-		sudo apt-get -y install update-manager-core
-		sudo apt-get -y install update-notifier-common
-	else
-		echo $pw | sudo -S apt-get -y remove ubuntu-release-upgrader-core
-		sudo apt-get -y install ubuntu-release-upgrader-core
-        sudo apt-get -y install ubuntu-server
-        sudo apt-get -y install update-manager-core
-        sudo apt-get -y install update-notifier-common
+	if [ "$check_codename" = "artful" ]; then
+		echo -e $CYAN"===== codename : $check_codename"$NC
+		do_release_upgrade
+	elif [ "$check_codename" = "bionic" ]; then
+		echo -e $CYAN"===== codename : bionic "$NC
+	else	
+		echo -e $RED"===== os codename is strange... exit"$NC
+		exit 1
 	fi
-	## will be deprecated
-	#sudo apt-get -y remove ubuntu-release-upgrader-core > /dev/null 
-	#sudo apt-get -y install ubuntu-release-upgrader-core > /dev/null
-	
-	echo -e $CYAN".\c" ; sleep 1 ; echo -e ".\c" ; sleep 1 ; echo -e "."$NC
-	
-	## it will be removed upgrade_log
-	#sudo rm -f upgrade_log
-	
 
-	## do-release-upgrade 
-	## checking if upgradable. if it is already upgrade, then modify services
-	echo -e $CYAN"=============== << 1 >> version upgrading start..."$NC
-	do_result=`do-release-upgrade -c`
-	if [[ "$do_result" =~ "No new release found." ]]; then
-		echo -e $CYAN"\n=============== << 1 >> version upgrading finished !!"$NC
-	else
-		echo -e $CYAN"If it is upgraded, then will reboot"$NC
-		echo -e $CYAN"So run this program ** one more time. **"$NC
-		while true; do
-			echo -e $CYAN"version check(c) version upgrade(u) exit(x)"$NC
-			read options
-			if [ "$options" = "c" ]; then
-				do-release-upgrade -c
-			elif [ "$options" = "u" ]; then
-				do-release-upgrade
-				break
-			elif [ "$options" = "x" ]; then
-				exit 0
-			else
-				echo -e $RED"Wrong options"$NC
-			fi
-		done
-	fi
-	
 	########################################################################################
 	echo -e $CYAN"\n=============== << 2 >> version upgrading start..."$NC
 	sleep 1
@@ -248,10 +274,10 @@ function start_upgrade(){
 
 	## file version checking and modifying
 	if [ ! -f "$file_os" ];then
-		sudo cp /etc/os-release /etc/os-release.prev &&
-		sudo cp /etc/lsb-release /etc/lsb-release.prev
+		echo $pw | sudo -S cp /etc/os-release /etc/os-release.prev &&
+		echo $pw | sudo -S cp /etc/lsb-release /etc/lsb-release.prev
 
-		error $? 
+		error $? 1
 
 		echo 'NAME="TmaxLinux"
 VERSION="TmaxLinux 4.1.1 (Bionic Beaver)"
@@ -267,21 +293,21 @@ DISTRIB_RELEASE=4.1.1
 DISTRIB_CODENAME=bionic
 DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 
-		sudo mv $HOME/os-release /etc/os-release
-		sudo mv $HOME/lsb-release /etc/lsb-release
+		echo $pw | sudo -S mv $HOME/os-release /etc/os-release
+		echo $pw | sudo -S mv $HOME/lsb-release /etc/lsb-release
 
 		error $? 1
 
-		sudo cp /etc/issue /etc/issue.prev &&
-		sudo cp /etc/issue.net /etc/issue.net.prev
+		echo $pw | sudo -S cp /etc/issue /etc/issue.prev &&
+		echo $pw | sudo -S cp /etc/issue.net /etc/issue.net.prev
 
 		error $? 1
 	
-		sudo echo 'TmaxLinux 4.1.1 \n \l' >> $HOME/issue
-		sudo echo 'TmaxLinux 4.1.1' >> $HOME/issue.net
+		echo $pw | sudo -S echo 'TmaxLinux 4.1.1 \n \l' >> $HOME/issue
+		echo $pw | sudo -S echo 'TmaxLinux 4.1.1' >> $HOME/issue.net
 
-		sudo mv $HOME/issue /etc/issue
-		sudo mv $HOME/issue.net /etc/issue.net
+		echo $pw | sudo -S mv $HOME/issue /etc/issue
+		echo $pw | sudo -S mv $HOME/issue.net /etc/issue.net
 
 		error $? 1
 		echo -e $CYAN"\n=============== << 2 >> version upgrading finished !!"$NC
@@ -300,7 +326,7 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 			sleep 1
 			echo "..."
 
-			sudo apt-get -y install vim gcc g++ libstdc++5 libaio1 libaio-dev unzip openssh-server openssh-client sshpass net-tools websockify python3 expect socat flex awscli curl procmail software-properties-common jq bridge-utils arptables iproute2 lxc qemu-kvm genisoimage cloud-utils openvpn quota nfs-kernel-server nfs-common rpcbind xmlstarlet libvirt-bin libvirt-dev virt-viewer qemu-system-x86 qemu-block-extra python-netaddr openjdk-8-jdk
+			echo $pw | sudo -S apt-get -y install vim gcc g++ libstdc++5 libaio1 libaio-dev unzip openssh-server openssh-client sshpass net-tools websockify python3 expect socat flex awscli curl procmail software-properties-common jq bridge-utils arptables iproute2 lxc qemu-kvm genisoimage cloud-utils openvpn quota nfs-kernel-server nfs-common rpcbind xmlstarlet libvirt-bin libvirt-dev virt-viewer qemu-system-x86 qemu-block-extra python-netaddr openjdk-8-jdk
 
 			error $? 2
 
@@ -308,7 +334,7 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 			#sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/nftables ./
 
 			#cd $HOME/nftables
-			#sudo dpkg -i *.deb
+			#echo $pw | sudo -S dpkg -i *.deb
 
 			#error $? 3
 		
@@ -331,17 +357,17 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 	#file="/etc/update-motd.d/50-motd-news.dpkg-dist"
 	#
 	#if [ -f "$file" ]; then
-	#	sudo mv /etc/update-motd.d/50-motd-news.dpkg-dist /etc/update-motd.d/50-motd-news
+	#	echo $pw | sudo -S mv /etc/update-motd.d/50-motd-news.dpkg-dist /etc/update-motd.d/50-motd-news
 	#	error $? 4
-	#	sudo systemctl restart motd-news.service
+	#	echo $pw | sudo -S systemctl restart motd-news.service
 	#	echo -e "\n=============== motd.service restart sucess"
 	#fi
 
 
 	## Remove Prozone repository ip
 	echo -e "=============== Remove Prozone repository IP... "
-	sudo sed -i "s/\# This is Prozone repository (TmaxLinux)//g" /etc/apt/sources.list
-	sudo sed -i "s/# deb \[arch=amd64\] http:\/\/175.195.163.192:8080\/tmax_repo\/prozone artful main//g" /etc/apt/sources.list
+	echo $pw | sudo -S sed -i "s/\# This is Prozone repository (TmaxLinux)//g" /etc/apt/sources.list
+	echo $pw | sudo -S sed -i "s/# deb \[arch=amd64\] http:\/\/175.195.163.192:8080\/tmax_repo\/prozone artful main//g" /etc/apt/sources.list
 	echo -e $CYAN"=============== Remove Prozone repository IP finish"$NC
 
 
@@ -355,8 +381,8 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 			sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/LinuxProject_versionUpgrade/mono/ ./ > /dev/null
 			touch $HOME/.upgrade/mono_log
 			cd $PWD/mono
-			sudo dpkg -i --force-all *.deb >> $HOME/.upgrade/mono_log 2>&1
-			sudo rm -rf $PWD/mono > /dev/null
+			echo $pw | sudo -S dpkg -i --force-all *.deb >> $HOME/.upgrade/mono_log 2>&1
+			echo $pw | sudo -S rm -rf $PWD/mono > /dev/null
 			mono --version
 			break
 		elif [ "$mono_answer" = "n" ]; then
@@ -371,7 +397,7 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 	##### Modify /etc/update-motd.d/10-help-text /etc/update-motd.d/10-help-text
 	re_help_text=`grep -r "#printf" /etc/update-motd.d/10-help-text`
 	if [ -z "$re_help_text" ]; then
-		sudo sed -i "s/printf/#printf/g" /etc/update-motd.d/10-help-text
+		echo $pw | sudo -S sed -i "s/printf/#printf/g" /etc/update-motd.d/10-help-text
 	else
 		echo -e $CYAN"===== no help text"$NC
 	fi
@@ -379,7 +405,7 @@ DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 	landscape_file="/etc/update-motd.d/50-landscape-sysinfo"
 
 	if [ -f "$landscape_file" ]; then
-		sudo rm -f /etc/update-motd.d/50-landscape-sysinfo
+		echo $pw | sudo -S rm -f /etc/update-motd.d/50-landscape-sysinfo
 	else
 		echo -e $CYAN"===== no landscape"$NC
 	fi
