@@ -42,18 +42,17 @@ function motd_news_inactive(){
 	file_motd_dpkg="/etc/update-motd.d/50-motd-news.dpkg-dist"
 	#file_motd="/etc/update-motd.d/50-motd-news"
 
-	exit_code_dpkg_which=`grep -r "ProLinux" $file_motd_dpkg`
-	#exit_code_which=`grep -r "ProLinux" $file_motd`
+	exit_code_dpkg_which=`grep -r "TmaxLinux" $file_motd_dpkg`
+	#exit_code_which=`grep -r "TmaxLinux" $file_motd`
 
 	if [ -a $file_motd_dpkg ]; then
-		if [[ "$exit_code_dpkg_which" =~ [ProLinux] ]]; then 
+		if [[ "$exit_code_dpkg_which" =~ [TmaxLinux] ]]; then 
             echo -e $CYAN"There is exit code here"$NC
         else
-            echo $pw | sudo -S sed -i 's/# Source the local configuration/# Source the local configuration\n# ProLinux exit code\nexit 0/g' $file_motd_dpkg
+            echo $pw | sudo -S sed -i 's/# Source the local configuration/# Source the local configuration\n# TmaxLinux exit code\nexit 0/g' $file_motd_dpkg
         fi
 	else
-		echo $RED"There is no motd service"$NC
-		exit 1
+		echo -e $RED"There is no motd service"$NC
 	fi
 
 	echo -e $CYAN"\n========= motd.news disable finish !!"$NC
@@ -61,10 +60,10 @@ function motd_news_inactive(){
 
 # help menu
 function helpmenu(){
-echo -e "*** ProLinux v4.0.0 to v4.1.1 upgrade tool ***"
+echo -e "*** TmaxLinux v4.0.0 to TmaxLinux v4.1.1 upgrade tool ***"
 cat <<-END
 Usage: ./version_upgrade [OPTION] ...
-This will upgrade ProLinux version as you wish
+This will upgrade TmaxLinux version as you wish
 Example: 
          ./version_upgrade -h
          ./version_upgrade -v
@@ -78,7 +77,7 @@ OPTION:
 END
 }
 
-## kernel upgrading which download at prolinux repository
+## kernel upgrading which download at tmaxlinux repository
 function kernel_upgrade(){
 	local pw=$1
 
@@ -227,7 +226,7 @@ function start_upgrade(){
 	fi
 
 	# start
-	echo -e $CYAN"=============== ProLinux version v4.0 to v4.1 upgrade ..."$NC
+	echo -e $CYAN"=============== TmaxLinux version v4.0 to v4.1 upgrade ..."$NC
 
 	##### Modify /etc/lsb-release /etc/os-release CODENAME=artful if CODENAME=4 
 	lsb_codename=`grep -w "4$" /etc/lsb-release`
@@ -273,19 +272,19 @@ function start_upgrade(){
 
 		error $? 1
 
-		echo 'NAME="ProLinux"
-VERSION="ProLinux 4.1.1 (Bionic Beaver)"
-ID=prolinux
+		echo 'NAME="TmaxLinux"
+VERSION="TmaxLinux 4.1.1 (Bionic Beaver)"
+ID=tmaxlinux
 ID_LIKE=debian
-PRETTY_NAME="ProLinux 4.1.1"
+PRETTY_NAME="TmaxLinux 4.1.1"
 VERSION_ID="4.1.1"
 VERSION_CODENAME=bionic
 PROLINUX_CODENAME=bionic' >> $HOME/os-release
 
-		echo 'DISTRIB_ID=ProLinux
+		echo 'DISTRIB_ID=TmaxLinux
 DISTRIB_RELEASE=4.1.1
 DISTRIB_CODENAME=bionic
-DISTRIB_DESCRIPTION="ProLinux 4.1.1"' >> $HOME/lsb-release
+DISTRIB_DESCRIPTION="TmaxLinux 4.1.1"' >> $HOME/lsb-release
 
 		echo $pw | sudo -S mv $HOME/os-release /etc/os-release
 		echo $pw | sudo -S mv $HOME/lsb-release /etc/lsb-release
@@ -297,8 +296,8 @@ DISTRIB_DESCRIPTION="ProLinux 4.1.1"' >> $HOME/lsb-release
 
 		error $? 1
 	
-		echo $pw | sudo -S echo 'ProLinux 4.1.1 \n \l' >> $HOME/issue
-		echo $pw | sudo -S echo 'ProLinux 4.1.1' >> $HOME/issue.net
+		echo $pw | sudo -S echo 'TmaxLinux 4.1.1 \n \l' >> $HOME/issue
+		echo $pw | sudo -S echo 'TmaxLinux 4.1.1' >> $HOME/issue.net
 
 		echo $pw | sudo -S mv $HOME/issue /etc/issue
 		echo $pw | sudo -S mv $HOME/issue.net /etc/issue.net
@@ -337,12 +336,12 @@ DISTRIB_DESCRIPTION="ProLinux 4.1.1"' >> $HOME/lsb-release
 
 	## Remove Prozone repository ip
 	echo -e "=============== Remove Prozone repository IP... "
-	echo $pw | sudo -S sed -i "s/\# This is Prozone repository (ProLinux)//g" /etc/apt/sources.list
+	echo $pw | sudo -S sed -i "s/\# This is Prozone repository (TmaxLinux)//g" /etc/apt/sources.list
 	echo $pw | sudo -S sed -i "s/# deb \[arch=amd64\] http:\/\/175.195.163.192:8080\/tmax_repo\/prozone artful main//g" /etc/apt/sources.list
 	echo -e $CYAN"=============== Remove Prozone repository IP finish"$NC
 
 
-	## Install ProLinux Mono package
+	## Install TmaxLinux Mono package
 	while true; do
 		echo -e $CYAN"\n=============== Do you want to install Mono packages? [y/n]"$NC
 		read mono_answer
@@ -399,7 +398,7 @@ do
     case "$1" in
 
         --version | -v)
-            echo "v1.1.0"
+            echo "v1.2.0"
 			exit
             ;;
 		--help | -h)
