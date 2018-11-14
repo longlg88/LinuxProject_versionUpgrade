@@ -42,10 +42,9 @@ function motd_news_inactive(){
 	file_motd_dpkg="/etc/update-motd.d/50-motd-news.dpkg-dist"
 	#file_motd="/etc/update-motd.d/50-motd-news"
 
-	exit_code_dpkg_which=`grep -r "ProLinux" $file_motd_dpkg`
-	#exit_code_which=`grep -r "ProLinux" $file_motd`
 
 	if [ -a $file_motd_dpkg ]; then
+		exit_code_dpkg_which=`grep -r "ProLinux" $file_motd_dpkg`
 		if [[ "$exit_code_dpkg_which" =~ [ProLinux] ]]; then 
             echo -e $CYAN"There is exit code here"$NC
         else
@@ -81,6 +80,12 @@ END
 function kernel_upgrade(){
 	local pw=$1
 
+	uname=`uname -r`
+    echo -e $YELLOW"This kernel is "$uname $NC
+
+	echo -e $YELLOW"Kernel upgrade will start!!"$NC
+
+	sleep 1
 	wget -c http://tmaxlinux-repo.tmaxos.com/k_modules/kernel_modules-4.18.10-3-generic.tar
 	stdout=`echo $?`
 	if [ $stdout -eq 0 ]; then
@@ -108,7 +113,6 @@ function kernel_upgrade(){
 function mkdir_upgrade_log(){
 	DATE=`date "+%Y %m/%d %H:%M:%S"`
     upgrade_dir=".upgrade"
-    
     if [ -d "$upgrade_dir" ]; then
         echo -e $CYAN"=================================== $DATE =================================="$NC
         echo -e $CYAN"Ready!!\n"$NC
@@ -124,6 +128,20 @@ function mkdir_upgrade_log(){
 function log_manage(){
 	fileDATE=`date "+%Y%m%d_%H%M"`
 	mv .upgrade/upgrade_log .upgrade/upgrade_log_$fileDATE
+}
+
+## update grub
+function update_grub(){
+	echo -e $CYAN"=============== Ready to update grub"$NC
+	if [ ! -d "/boot/grub/themes/prolinux/" ]; then
+		wget -c http://tmaxlinux-repo.tmaxos.com/k_modules/grub-theme-prolinux_4.2.0_amd64.deb
+		echo $pw | sudo -S apt-get -y purge grub-theme-tmaxlinux
+		echo $pw | sudo -S dpkg -i grub-theme-prolinux_4.2.0_amd64.deb
+		echo $pw | sudo -S update-grub
+		echo -e $CYAN"=============== Update grub finish"$NC
+	else
+		echo -e $CYAN"=============== Already grub update!!"$NC
+	fi
 }
 
 ## upgrade artful -> bionic logic
@@ -185,8 +203,6 @@ function do_release_upgrade(){
 ## start upgrade function
 function start_upgrade(){
 	local pw=$1
-	uname=`uname -r`
-	echo -e $YELLOW"This kernel is "$uname $NC
 
 	## root password checking
 	
@@ -227,6 +243,10 @@ function start_upgrade(){
 
 	# start
 	echo -e $CYAN"=============== ProLinux version v4.0 to v4.1 upgrade ..."$NC
+
+
+	# call update_grub()
+	update_grub
 
 	##### Modify /etc/lsb-release /etc/os-release CODENAME=artful if CODENAME=4 
 	lsb_codename=`grep -w "4$" /etc/lsb-release`
@@ -277,7 +297,7 @@ VERSION="ProLinux 4.2.0 (Bionic Beaver)"
 ID=prolinux
 ID_LIKE=debian
 PRETTY_NAME="ProLinux 4.2.0"
-VERSION_ID="4.2.2"
+VERSION_ID="4.2.0"
 VERSION_CODENAME=bionic
 PROLINUX_CODENAME=bionic' >> $HOME/os-release
 
