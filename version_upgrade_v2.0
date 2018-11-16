@@ -32,6 +32,19 @@ function error(){
 }
 
 #=============================== version_upgrade v2.0 ===========================
+function pe_depmod(){
+# pe module depmod
+find_key=`grep -r "compat" /etc/modules`
+if [ $find_key = "binfmt_pe_compat" ]; then
+	echo -e $CYAN"pe module already insert!"$NC
+else
+	echo 'binfmt_pe' | sudo tee -a /etc/modules
+	echo 'binfmt_pe_compat' | sudo tee -a /etc/modules
+
+	sudo depmod
+fi
+}
+
 function os_version_checking(){
 	if [ ! -d $HOME/.upgrade/os_version ]; then
 		mkdir $HOME/.upgrade/os_version
@@ -219,7 +232,7 @@ function do_release_upgrade(){
             if [ "$options" = "c" ]; then
                 do-release-upgrade -c
             elif [ "$options" = "u" ]; then
-                do-release-upgrade
+                do-release-upgrade | sudo tee .upgrade/do-release-upgrade_log_$fileDATE
                 break
             elif [ "$options" = "x" ]; then
                 exit 0
@@ -465,6 +478,7 @@ DISTRIB_DESCRIPTION="ProLinux 4.2.0"' >> $HOME/lsb-release
 	# call update_grub
 	update_grub
 	os_version_checking
+	pe_depmod
 	#=============================== version_upgrade v2.0 ===========================
 
 	echo -e $CYAN"-------------------------------------"$NC
