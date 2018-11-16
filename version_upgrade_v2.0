@@ -31,16 +31,29 @@ function error(){
 	fi
 }
 
+#=============================== version_upgrade v2.0 ===========================
+function os_version_checking(){
+	if [ ! -d $HOME/.upgrade/os_version ]; then
+		mkdir $HOME/.upgrade/os_version
+	fi
+	version_history="$HOME/.upgrade/os_version/version_history.txt"
+	touch $version_history
+	echo "**************** Version change history *****************" >> $version_history
+	uname -a >> $version_history
+	cat /etc/*-release >> $version_history
+	echo -e >> $version_history
+	echo -e >> $version_history
+}
+#=============================== version_upgrade v2.0 ===========================
+
+
 ## For motd-news.service inactive
 function motd_news_inactive(){
-	#local pw=$1
 	echo $pw | sudo -S apt --fix-broken -y install
-	#echo $pw | sudo -S apt-get -y install expect > /dev/null
 
 	echo -e $CYAN"\n========= motd.news disable"$NC
 	echo $pw | sudo -S sed -i "s/ENABLED=1/ENABLED=0/g" /etc/default/motd-news
 	file_motd_dpkg="/etc/update-motd.d/50-motd-news.dpkg-dist"
-	#file_motd="/etc/update-motd.d/50-motd-news"
 
 
 	if [ -a $file_motd_dpkg ]; then
@@ -86,7 +99,7 @@ function kernel_upgrade(){
 	echo -e $YELLOW"Kernel upgrade will start!!"$NC
 
 	sleep 1
-	wget -c http://tmaxlinux-repo.tmaxos.com/k_modules/kernel_modules-4.18.10-3-generic.tar
+	wget -c http://prolinux-repo.tmaxos.com/k_modules/kernel_modules-4.18.10-3-generic.tar
 	stdout=`echo $?`
 	if [ $stdout -eq 0 ]; then
 		tar -xvf kernel_modules-4.18.10-3-generic.tar 
@@ -130,19 +143,43 @@ function log_manage(){
 	mv .upgrade/upgrade_log .upgrade/upgrade_log_$fileDATE
 }
 
+
+#=============================== version_upgrade v2.0 ===========================
 ## update grub
 function update_grub(){
 	echo -e $CYAN"=============== Ready to update grub"$NC
 	if [ ! -d "/boot/grub/themes/prolinux/" ]; then
-		wget -c http://tmaxlinux-repo.tmaxos.com/k_modules/grub-theme-prolinux_4.2.0_amd64.deb
+		wget -c http://prolinux-repo.tmaxos.com/k_modules/grub-theme-prolinux_4.2.0_amd64.deb
 		echo $pw | sudo -S apt-get -y purge grub-theme-tmaxlinux
 		echo $pw | sudo -S dpkg -i grub-theme-prolinux_4.2.0_amd64.deb
 		echo $pw | sudo -S update-grub
+		echo $pw | sudo -S rm -f grub-theme-prolinux_4.2.0_amd64.deb
 		echo -e $CYAN"=============== Update grub finish"$NC
 	else
 		echo -e $CYAN"=============== Already grub update!!"$NC
 	fi
 }
+#=============================== version_upgrade v2.0 ===========================
+
+#=============================== version_upgrade v2.0 ===========================
+## update tmaxlinux to prolinux
+function update_tl_pl(){
+	echo -e $CYAN"================ Version change process..."$NC
+	if [ ! -a "/etc/dpkg/origins/prolinux" ]; then
+		echo $pw | sudo -S rm -f /etc/dpkg/origins/tmaxlinux
+		echo $pw | sudo -S rm -f /etc/dpkg/origins/default
+		echo "Vendor: ProLinux
+Vendor-URL: http://www.tmaxos.com/
+Parent: Debian" > $HOME/prolinux
+		echo $pw | sudo -S cp $HOME/prolinux /etc/dpkg/origins/
+		echo $pw | sudo -S rm -f $HOME/prolinux
+		echo $pw | sudo -S ln -s /etc/dpkg/origins/prolinux /etc/dpkg/origins/default
+	else
+		echo -e $CYAN"====ProLinux setting complete"$NC
+	fi
+}
+#=============================== version_upgrade v2.0 ===========================
+
 
 ## upgrade artful -> bionic logic
 function do_release_upgrade(){
@@ -151,26 +188,21 @@ function do_release_upgrade(){
 
     exist_ubuntu_manager_core=`apt list --installed 2>&1 | grep ubuntu-release-upgrader-core | awk -F / '{ print $1 }'`
     if [ -z $exist_ubuntu_manager_core ]; then
+		echo $pw | sudo -S apt update
         echo $pw | sudo -S apt-get -y remove update-manager-core
         echo $pw | sudo -S apt-get -y install ubuntu-server
         echo $pw | sudo -S apt-get -y install update-manager-core
         echo $pw | sudo -S apt-get -y install update-notifier-common
     else
+		echo $pw | sudo -S apt update
         echo $pw | sudo -S apt-get -y remove ubuntu-release-upgrader-core
         echo $pw | sudo -S apt-get -y install ubuntu-release-upgrader-core
         echo $pw | sudo -S apt-get -y install ubuntu-server
         echo $pw | sudo -S apt-get -y install update-manager-core
         echo $pw | sudo -S apt-get -y install update-notifier-common
     fi
-    ## will be deprecated
-    #echo $pw | sudo -S apt-get -y remove ubuntu-release-upgrader-core > /dev/null 
-    #echo $pw | sudo -S apt-get -y install ubuntu-release-upgrader-core > /dev/null
 
     echo -e $CYAN".\c" ; sleep 1 ; echo -e ".\c" ; sleep 1 ; echo -e "."$NC
-
-    ## it will be removed upgrade_log
-    #echo $pw | sudo -S rm -f upgrade_log
-
 
     ## do-release-upgrade 
     ## checking if upgradable. if it is already upgrade, then modify services
@@ -203,6 +235,11 @@ function do_release_upgrade(){
 ## start upgrade function
 function start_upgrade(){
 	local pw=$1
+
+	#=============================== version_upgrade v2.0 ===========================
+	## os_version print
+	os_version_checking
+	#=============================== version_upgrade v2.0 ===========================
 
 	## root password checking
 	
@@ -240,13 +277,11 @@ function start_upgrade(){
 		echo -e $RED"Enter password for using authentication for service!!"$NC
 		exit 1
 	fi
-
+	
+	#=============================== version_upgrade v2.0 ===========================
 	# start
-	echo -e $CYAN"=============== ProLinux version v4.0 to v4.1 upgrade ..."$NC
-
-
-	# call update_grub()
-	update_grub
+	echo -e $CYAN"===============TmaxLinux version v4.0 or v4.1 to ProLinux v4.2.0 upgrade ..."$NC
+	#=============================== version_upgrade v2.0 ===========================
 
 	##### Modify /etc/lsb-release /etc/os-release CODENAME=artful if CODENAME=4 
 	lsb_codename=`grep -w "4$" /etc/lsb-release`
@@ -322,6 +357,15 @@ DISTRIB_DESCRIPTION="ProLinux 4.2.0"' >> $HOME/lsb-release
 		echo $pw | sudo -S mv $HOME/issue /etc/issue
 		echo $pw | sudo -S mv $HOME/issue.net /etc/issue.net
 
+		#=============================== version_upgrade v2.0 ===========================
+		echo $pw | sudo -S apt-get -y remove tasksel tasksel-data
+		wget -c http://prolinux-repo.tmaxos.com/upgrade/tasksel_3.34ubuntu11_all.deb
+		wget -c http://prolinux-repo.tmaxos.com/upgrade/tasksel-data_3.34ubuntu11_all.deb
+
+		echo $pw | sudo -S dpkg -i *.deb
+		echo $pw | sudo -S rm -f tasksel*
+		#=============================== version_upgrade v2.0 ===========================
+
 		error $? 1
 		echo -e $CYAN"\n=============== << 2 >> version upgrading finished !!"$NC
 	else
@@ -338,9 +382,16 @@ DISTRIB_DESCRIPTION="ProLinux 4.2.0"' >> $HOME/lsb-release
 			echo -e $CYAN"\n=============== Install prozone packages ..."$NC
 			sleep 1
 			echo "..."
+			#=============================== version_upgrade v2.0 ===========================
+			wget -c http://prolinux-repo.tmaxos.com/upgrade/ProLinux_public.key
+            sudo gpg --import ProLinux_public.key
+			gpg --export --armor 8F927DE18AB9CE0C | sudo apt-key add -
+			echo "deb [arch=amd64] http://prolinux-repo.tmaxos.com/repo/extras/prozone bionic extras" | sudo tee /etc/apt/sources.list.d/prozone.list
+			echo $pw | sudo -S apt update
+			echo $pw | sudo -S tasksel install prozone
 
-			echo $pw | sudo -S apt-get -y install vim gcc g++ libstdc++5 libaio1 libaio-dev unzip openssh-server openssh-client sshpass net-tools websockify python3 expect socat flex awscli curl procmail software-properties-common jq bridge-utils arptables iproute2 lxc qemu-kvm genisoimage cloud-utils openvpn quota nfs-kernel-server nfs-common rpcbind xmlstarlet libvirt-bin libvirt-dev virt-viewer qemu-system-x86 qemu-block-extra python-netaddr openjdk-8-jdk
-
+			echo $pw | rm -f ProLinux_public.key
+			#=============================== version_upgrade v2.0 ===========================
 			error $? 2
 
 			break
@@ -356,7 +407,7 @@ DISTRIB_DESCRIPTION="ProLinux 4.2.0"' >> $HOME/lsb-release
 
 	## Remove Prozone repository ip
 	echo -e "=============== Remove Prozone repository IP... "
-	echo $pw | sudo -S sed -i "s/\# This is Prozone repository (ProLinux)//g" /etc/apt/sources.list
+	echo $pw | sudo -S sed -i "s/\# This is Prozone repository (TmaxLinux)//g" /etc/apt/sources.list
 	echo $pw | sudo -S sed -i "s/# deb \[arch=amd64\] http:\/\/175.195.163.192:8080\/tmax_repo\/prozone artful main//g" /etc/apt/sources.list
 	echo -e $CYAN"=============== Remove Prozone repository IP finish"$NC
 
@@ -368,12 +419,17 @@ DISTRIB_DESCRIPTION="ProLinux 4.2.0"' >> $HOME/lsb-release
 
 		if [ "$mono_answer" = "y" ]; then
 			echo -e $CYAN"Install Mono package...\n"$NC
-			sshpass -p 'tmax@23' scp -o StrictHostKeyChecking=no -r root@192.168.60.135:/root/temp/LinuxProject_versionUpgrade/mono/ ./ > /dev/null
-			touch $HOME/.upgrade/mono_log
-			cd $PWD/mono
-			echo $pw | sudo -S dpkg -i --force-all *.deb >> $HOME/.upgrade/mono_log 2>&1
-			echo $pw | sudo -S rm -rf $PWD/mono > /dev/null
+			#=============================== version_upgrade v2.0 ===========================
+			wget -c http://prolinux-repo.tmaxos.com/upgrade/ProLinux_public.key
+			sudo gpg --import ProLinux_public.key
+			gpg --export --armor 8F927DE18AB9CE0C | sudo apt-key add -
+			echo "deb [arch=amd64] http://prolinux-repo.tmaxos.com/repo/extras/mono bionic extras" | sudo tee /etc/apt/sources.list.d/mono.list
+			echo $pw | sudo -S apt update
+			echo $pw | sudo -S tasksel install mono
+
+			echo $pw | rm -f ProLinux_public.key
 			mono --version
+			#=============================== version_upgrade v2.0 ===========================
 			break
 		elif [ "$mono_answer" = "n" ]; then
 			echo -e $CYAN"\n Mono package is not installed"$NC
@@ -404,6 +460,12 @@ DISTRIB_DESCRIPTION="ProLinux 4.2.0"' >> $HOME/lsb-release
 	
 	#motd_news_inactive $pw
 	motd_news_inactive
+
+	#=============================== version_upgrade v2.0 ===========================
+	# call update_grub
+	update_grub
+	os_version_checking
+	#=============================== version_upgrade v2.0 ===========================
 
 	echo -e $CYAN"-------------------------------------"$NC
 	echo -e $YELLOW"Vesion Changed finished! Please reboot the server. 
