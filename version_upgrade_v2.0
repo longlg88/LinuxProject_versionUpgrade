@@ -352,8 +352,8 @@ function start_upgrade(){
 	check_count_bionic=`cat /etc/apt/sources.list | grep bionic | wc -l`
 	if [ -f "/var/log/dist-upgrade/screenlog.0" ]; then ## is upgrade
 		if [ $check_count_bionic -ne 0 ]; then ## bionic
-			check_upg_ok=`grep -ri "continue \[yn\] y" /var/log/dist-upgrade/screenlog.0`
-			if [[ $check_upg_ok =~ "Continue" ]]; then ## if it is upgrading start
+			check_upg_ok=`grep -ri "if you select 'y' the system will be restarted." /var/log/dist-upgrade/screenlog.0`
+			if [[ $check_upg_ok =~ "restarted" ]]; then ## if it is upgrading start
 				echo -e $CYAN"===== codename : $check_codename"$NC
 			else
 				echo -e $RED"===== Upgrade did not continuing... Please run 'version_upgrade' once again"$NC
